@@ -30,7 +30,7 @@ def base_install(session, flask, mongoengine, toolbar):
     return session
 
 
-@nox.session(python="3.12")
+@nox.session(python="3.8")
 def lint(session):
     """Run linting check locally."""
     session.install("pre-commit")
