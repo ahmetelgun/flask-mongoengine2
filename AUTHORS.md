@@ -93,9 +93,3 @@ This project is made by incredible authors:
 - Иришка
 - Павел Литвиненко
 - 庄天翼
-
-This project inspired by two repos:
-
-- [danjac]
-
-[danjac]: https://bitbucket.org/danjac/flask-mongoengine
