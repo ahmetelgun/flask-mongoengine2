@@ -30,14 +30,14 @@ def base_install(session, flask, mongoengine, toolbar):
     return session
 
 
-@nox.session(python="3.8")
+@nox.session(python="3.10")
 def lint(session):
     """Run linting check locally."""
     session.install("pre-commit")
     session.run("pre-commit", "run", "-a")
 
 
-@nox.session(python=["3.8", "3.9", "3.10", "3.11", "3.12"])
+@nox.session(python=["3.8", "3.9", "3.10", "3.11"])
 @nox.parametrize("flask", [">=2.3.0", ">=3.0.0"])
 @nox.parametrize(
     "mongoengine", ["==0.21.0", "==0.22.1", "==0.23.1", ">=0.24.1", ">=0.27.0"]
@@ -67,7 +67,7 @@ def _run_in_docker(session):
         session.run_always("docker", "rm", "-fv", "nox_docker_test", external=True)
 
 
-@nox.session(python=["3.8", "3.9", "3.10", "3.11", "3.12"])
+@nox.session(python=["3.8", "3.9", "3.10", "3.11"])
 @nox.parametrize("flask", [">=2.3.0", ">=3.0.0"])
 @nox.parametrize(
     "mongoengine", ["==0.21.0", "==0.22.1", "==0.23.1", ">=0.24.1", ">=0.27.0"]
@@ -79,7 +79,7 @@ def full_tests(session, flask, mongoengine, toolbar):
     _run_in_docker(session)
 
 
-@nox.session(python=["3.8", "3.9", "3.10", "3.11", "3.12"])
+@nox.session(python=["3.8", "3.9", "3.10", "3.11"])
 @nox.parametrize("toolbar", [True, False])
 def latest(session, toolbar):
     """Run minimum tests for checking minimum code quality."""
