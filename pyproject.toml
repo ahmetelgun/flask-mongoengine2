@@ -36,11 +36,8 @@ keywords = [
   "mongoengine",
   "extension"
 ]
-authors = [
-  {name = "Ross Lawley", email = "ross.lawley@gmail.com"}
-]
 maintainers = [
-  {name = "Andrey Shpak", email = "ashpak@ashpak.ru"}
+  {name = "Ahmet Elgün", email = "ahmetelgn@gmail.com"}
 ]
 dynamic = ["version"]
 
