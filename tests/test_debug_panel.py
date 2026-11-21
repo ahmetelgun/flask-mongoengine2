@@ -3,6 +3,7 @@ Tests for ``MongoDebugPanel`` and related mongo events listener.
 
 - Independent of global configuration by design.
 """
+
 import contextlib
 
 import jinja2
@@ -126,7 +127,7 @@ class TestMongoDebugPanel:
         self,
         toolbar_with_no_flask,
     ):
-        assert toolbar_with_no_flask.nav_subtitle() == "0 operations, in  0.00ms"
+        assert toolbar_with_no_flask.nav_subtitle() == "0 operations, in 0.00ms"
         assert toolbar_with_no_flask.has_content is True
 
     def test__context__is_empty_by_default(self, app, toolbar_with_no_flask):
@@ -219,30 +220,76 @@ class TestMongoCommandLogger:
 
     def test__failed_command_logged__logged(self, py_db, registered_monitoring):
         """Failed command index 1 in provided test."""
-        pymongo.collection.Collection(py_db, "test", create=True)
+        py_db.command({"create": "test"})
         with contextlib.suppress(OperationFailure):
-            pymongo.collection.Collection(py_db, "test", create=True)
+            py_db.command({"find": "test", "filter": {"$invalidOperator": 1}})
         assert registered_monitoring.started_operations_count == 2
         assert registered_monitoring.succeeded_operations_count == 1
         assert registered_monitoring.failed_operations_count == 1
-        assert registered_monitoring.queries[0].time >= 0
-        assert registered_monitoring.queries[0].size >= 0
         assert registered_monitoring.queries[0].database == "pymongo_test_database"
         assert registered_monitoring.queries[0].collection == "test"
         assert registered_monitoring.queries[0].command_name == "create"
-        assert isinstance(registered_monitoring.queries[0].operation_id, int)
-        assert registered_monitoring.queries[0].server_command["create"] == "test"
         assert registered_monitoring.queries[0].server_response == {"ok": 1.0}
         assert registered_monitoring.queries[0].request_status == "Succeed"
-        assert registered_monitoring.queries[1].time >= 0
-        assert registered_monitoring.queries[1].size >= 0
-        assert registered_monitoring.queries[1].database == "pymongo_test_database"
-        assert registered_monitoring.queries[1].collection == "test"
-        assert registered_monitoring.queries[1].command_name == "create"
-        assert isinstance(registered_monitoring.queries[1].operation_id, int)
-        assert registered_monitoring.queries[1].server_command["create"] == "test"
-        assert (
-            "already exists"
-            in registered_monitoring.queries[1].server_response["errmsg"]
+        failed = registered_monitoring.queries[1]
+        assert failed.time >= 0
+        assert failed.size > 0
+        assert failed.database == "pymongo_test_database"
+        assert failed.collection == "test"
+        assert failed.command_name == "find"
+        assert isinstance(failed.operation_id, int)
+        assert failed.server_command["filter"] == {"$invalidOperator": 1}
+        assert "$invalidOperator" in failed.server_response["errmsg"]
+        assert failed.request_status == "Failed"
+
+    def test__bulk_operation__pairs_each_command_with_its_start_event(
+        self, py_db, registered_monitoring
+    ):
+        """Commands of one bulk share operation_id, they must be paired by request."""
+        py_db.items.insert_one({"i": 0})
+        registered_monitoring.reset_tracker()
+        py_db.items.bulk_write(
+            [pymongo.InsertOne({"i": 1}), pymongo.DeleteOne({"i": 0})], ordered=True
         )
-        assert registered_monitoring.queries[1].request_status == "Failed"
+        queries = registered_monitoring.queries
+        assert [q.command_name for q in queries] == ["insert", "delete"]
+        assert queries[0].operation_id == queries[1].operation_id
+        assert "documents" in queries[0].server_command
+        assert "deletes" in queries[1].server_command
+        assert registered_monitoring.started_events == {}
+
+    def test__final_event_without_start_event__is_ignored(
+        self, py_db, registered_monitoring
+    ):
+        py_db.posts.insert_one({"a": 1})
+        registered_monitoring.queries.clear()
+        registered_monitoring.started_events.clear()
+        py_db.posts.find_one()
+        # Emulate a reset in between "started" and "succeeded" events.
+        assert len(registered_monitoring.queries) == 1
+        event = registered_monitoring.queries[0]._event
+        registered_monitoring.queries.clear()
+        registered_monitoring.succeeded(event)
+        assert registered_monitoring.queries == []
+        assert registered_monitoring.succeeded_operations_count == 3
+
+
+def test__maybe_patch_jinja_loader__does_not_add_loader_twice():
+    """Regression: a new loader was appended on each panel (request) creation."""
+    jinja2_env = jinja2.Environment(loader=ChoiceLoader([DictLoader({"1": "1"})]))
+    for _ in range(3):
+        _maybe_patch_jinja_loader(jinja2_env)
+    assert len(jinja2_env.loader.loaders) == 2
+
+
+def test__panel__renders_real_queries(app_no_mongo_monitoring, registered_monitoring):
+    client = pymongo.MongoClient("localhost", 27017)
+    try:
+        client.pymongo_test_database.posts.insert_one({"a": 1})
+    finally:
+        client.close()
+    panel = MongoDebugPanel(app_no_mongo_monitoring.jinja_env)
+    html = panel.content()
+    assert "pymongo_test_database" in html
+    assert "insert" in html
+    assert "Succeed" in html

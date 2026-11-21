@@ -50,7 +50,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "Flask-MongoEngine2"
-copyright = "2010-2020, Streetlife and others"
+copyright = "2010-2026, Streetlife and others"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -240,10 +240,10 @@ man_pages = [
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
-    "flask": ("https://flask.palletsprojects.com/en/2.3.x/", None),
-    "werkzeug": ("https://werkzeug.palletsprojects.com/en/2.1.x/", None),
+    "flask": ("https://flask.palletsprojects.com/en/stable/", None),
+    "werkzeug": ("https://werkzeug.palletsprojects.com/en/stable/", None),
     "pymongo": ("https://pymongo.readthedocs.io/en/stable/", None),
-    "mongoengine": ("https://docs.mongoengine.org/", None),
+    "mongoengine": ("https://mongoengine-odm.readthedocs.io/", None),
 }
 myst_enable_extensions = [
     "tasklist",

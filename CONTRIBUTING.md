@@ -17,7 +17,7 @@ integration or feature.
 
 ## Supported interpreters
 
-Flask-MongoEngine2 supports CPython 3.8 and newer. Language features
+Flask-MongoEngine2 supports CPython 3.10 and newer. Language features
 not supported by all interpreters can not be used.
 
 ## Running tests
@@ -165,8 +165,8 @@ Rendered documentation will be available under: <http://localhost:9812/>
 - Developers should avoid including typing information to docstrings, if possible.
 - Developers should avoid including typing information to docstrings and signatures
   in same objects, to avoid rendering conflicts.
-- Code formatting is completely done by [black] and following black's style
-  implementation of [PEP8]. Target python version is the lowest supported version.
+- Code formatting and linting is completely done by [ruff] (black compatible style
+  implementation of [PEP8]). Target python version is the lowest supported version.
 - Code formatting should be done before passing any new merge requests.
 - Code style should use f-strings if possible, exceptional can be made for expensive
   debug level logging statements.
@@ -190,13 +190,13 @@ All tests are run on [GitHub actions] and any pull requests are automatically te
 for full range of supported [Flask], [mongoengine], [python] and [mongodb] versions.
 Any pull requests without tests will take longer to be integrated and might be refused.
 
-[community]: AUTHORS.md
+[community]: https://github.com/ahmetelgun/flask-mongoengine2/blob/main/AUTHORS.md
 
 [tickets]: https://github.com/ahmetelgun/flask-mongoengine2/issues?state=open
 
 [PEP8]: http://www.python.org/dev/peps/pep-0008/
 
-[black]: https://github.com/psf/black
+[ruff]: https://docs.astral.sh/ruff/
 
 [pre-commit]: https://pre-commit.com/
 
@@ -210,7 +210,7 @@ Any pull requests without tests will take longer to be integrated and might be r
 
 [mongodb]: https://www.mongodb.com/
 
-[AUTHORS.md]: AUTHORS.md
+[AUTHORS.md]: https://github.com/ahmetelgun/flask-mongoengine2/blob/main/AUTHORS.md
 
 [documentation]: https://flask-mongoengine2.readthedocs.io
 

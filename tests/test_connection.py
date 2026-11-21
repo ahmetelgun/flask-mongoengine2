@@ -1,5 +1,6 @@
 import mongoengine
 import pytest
+from flask import Config
 from mongoengine.connection import ConnectionFailure
 from mongoengine.context_managers import switch_db
 from pymongo.database import Database
@@ -8,8 +9,15 @@ from pymongo.mongo_client import MongoClient
 from pymongo.read_preferences import ReadPreference
 
 from flask_mongoengine2 import MongoEngine, current_mongoengine_instance
+from flask_mongoengine2.connection import (
+    _get_name,
+    _sanitize_settings,
+    create_connections,
+    get_connection_settings,
+)
 
 
+@pytest.mark.filterwarnings("ignore:Passing flat configuration:DeprecationWarning")
 def test_connection__should_use_defaults__if_no_settings_provided(app):
     """Make sure a simple connection to a standalone MongoDB works."""
     db = MongoEngine()
@@ -35,6 +43,7 @@ def test_connection__should_use_defaults__if_no_settings_provided(app):
     assert connection.PORT == 27017
 
 
+@pytest.mark.filterwarnings("ignore:Passing flat configuration:DeprecationWarning")
 @pytest.mark.parametrize(
     ("config_extension"),
     [
@@ -86,6 +95,7 @@ def test_connection__should_pass_alias__if_provided(app, config_extension):
     assert connection.PORT == 27017
 
 
+@pytest.mark.filterwarnings("ignore:Passing flat configuration:DeprecationWarning")
 @pytest.mark.parametrize(
     ("config_extension"),
     [
@@ -128,6 +138,7 @@ def test_connection__should_parse_host_uri__if_host_formatted_as_uri(
     assert connection.PORT == 27017
 
 
+@pytest.mark.filterwarnings("ignore:Passing flat configuration:DeprecationWarning")
 @pytest.mark.parametrize(
     ("config_extension"),
     [
@@ -240,6 +251,7 @@ def test_multiple_connections(app):
         assert doc is not None
 
 
+@pytest.mark.filterwarnings("ignore:Passing flat configuration:DeprecationWarning")
 def test_incorrect_value_with_mongodb_prefix__should_trigger_mongoengine_raise(app):
     db = MongoEngine()
     app.config["MONGODB_HOST"] = "mongodb://localhost:27017/flask_mongoengine_test_db"
@@ -263,3 +275,54 @@ def test_connection_kwargs(app):
 
     assert db.connection["tz_aware_true"].codec_options.tz_aware
     assert db.connection["tz_aware_true"].read_preference == ReadPreference.SECONDARY
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("MAXPOOLSIZE", "maxPoolSize"),
+        ("maxPoolSize", "maxPoolSize"),
+        ("replicaset", "replicaSet"),
+        ("TZ_AWARE", "tz_aware"),
+        ("HOST", "host"),
+    ],
+)
+def test__get_name__should_return_pymongo_spelling(name, expected):
+    assert _get_name(name) == expected
+
+
+def test__sanitize_settings__should_strip_prefix_case_insensitive():
+    assert _sanitize_settings(
+        {"MONGODB_HOST": "h", "mongodb_DB": "d", "ALIAS": "a", "mongodb_replicaset": 1}
+    ) == {"host": "h", "db": "d", "alias": "a", "replicaSet": 1}
+
+
+@pytest.mark.parametrize("config", [None, {}, [], "string", 1])
+def test_create_connections__should_raise_type_error__if_config_not_mapping(config):
+    with pytest.raises(TypeError, match="Config dictionary expected"):
+        create_connections(config)
+
+
+def test_get_connection_settings__should_not_warn__with_mongodb_settings(recwarn):
+    assert get_connection_settings({"MONGODB_SETTINGS": {"DB": "x"}}) == [{"db": "x"}]
+    assert get_connection_settings(
+        {"MONGODB_SETTINGS": ({"DB": "x"}, {"DB": "y"})}
+    ) == [
+        {"db": "x"},
+        {"db": "y"},
+    ]
+    assert not recwarn.list
+
+
+def test_get_connection_settings__should_warn_and_filter__with_flat_config():
+    config = Config(".")
+    config.update(MONGODB_DB="x", SECRET_KEY="ignored")
+    with pytest.warns(DeprecationWarning, match="flat configuration"):
+        assert get_connection_settings(config) == [{"db": "x"}]
+
+
+def test_create_connections__should_default_uuid_representation(app):
+    connections = create_connections(
+        {"MONGODB_SETTINGS": {"db": "flask_mongoengine_test_db", "alias": "uuid"}}
+    )
+    assert connections["uuid"].codec_options.uuid_representation == 4  # STANDARD

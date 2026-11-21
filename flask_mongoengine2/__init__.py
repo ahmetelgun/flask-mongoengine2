@@ -1,144 +1,112 @@
-import warnings
+"""Flask extension that provides integration with MongoEngine."""
+
+from __future__ import annotations
+
+from typing import Any
 
 import mongoengine
 from flask import Flask, current_app
-from mongoengine import fields as db_fields
+from pymongo import MongoClient
 
 from flask_mongoengine2 import documents
-from flask_mongoengine2.connection import *
-from flask_mongoengine2.pagination import *
-from flask_mongoengine2.sessions import *
+from flask_mongoengine2.connection import (
+    _warn_flat_config,
+    create_connections,
+    get_connection_settings,
+)
+from flask_mongoengine2.pagination import ListFieldPagination, Pagination
+from flask_mongoengine2.sessions import MongoEngineSession, MongoEngineSessionInterface
+
+try:
+    from flask_mongoengine2._version import version as __version__
+except ImportError:  # pragma: no cover - not installed via setuptools-scm
+    __version__ = "0.0.0"
+
+__all__ = (
+    "ListFieldPagination",
+    "MongoEngine",
+    "MongoEngineSession",
+    "MongoEngineSessionInterface",
+    "Pagination",
+    "__version__",
+    "create_connections",
+    "current_mongoengine_instance",
+    "get_connection_settings",
+)
 
 
-def current_mongoengine_instance():
+def current_mongoengine_instance() -> MongoEngine | None:
     """Return a MongoEngine instance associated with current Flask app."""
-    me = current_app.extensions.get("mongoengine", {})
-    for k, v in me.items():
-        if isinstance(k, MongoEngine):
-            return k
+    instances = current_app.extensions.get("mongoengine", {})
+    return next((k for k in instances if isinstance(k, MongoEngine)), None)
 
 
 class MongoEngine:
-    """Main class used for initialization of Flask-MongoEngine2."""
+    """Main class used for initialization of Flask-MongoEngine2.
 
-    def __init__(self, app=None, config=None):
-        if config is not None:
-            warnings.warn(
-                (
-                    "Passing flat configuration is deprecated. Please check "
-                    "https://flask-mongoengine2.readthedocs.io/en/latest/flask_config.html "
-                    "for more info."
-                ),
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        # Extended database fields
-        self.BinaryField = db_fields.BinaryField
-        self.BooleanField = db_fields.BooleanField
-        self.CachedReferenceField = db_fields.CachedReferenceField
-        self.ComplexDateTimeField = db_fields.ComplexDateTimeField
-        self.DateField = db_fields.DateField
-        self.DateTimeField = db_fields.DateTimeField
-        self.DecimalField = db_fields.DecimalField
-        self.DictField = db_fields.DictField
-        self.DynamicField = db_fields.DynamicField
-        self.EmailField = db_fields.EmailField
-        self.EmbeddedDocumentField = db_fields.EmbeddedDocumentField
-        self.EmbeddedDocumentListField = db_fields.EmbeddedDocumentListField
-        self.EnumField = db_fields.EnumField
-        self.FileField = db_fields.FileField
-        self.FloatField = db_fields.FloatField
-        self.GenericEmbeddedDocumentField = db_fields.GenericEmbeddedDocumentField
-        self.GenericLazyReferenceField = db_fields.GenericLazyReferenceField
-        self.GenericReferenceField = db_fields.GenericReferenceField
-        self.GeoJsonBaseField = db_fields.GeoJsonBaseField
-        self.GeoPointField = db_fields.GeoPointField
-        self.ImageField = db_fields.ImageField
-        self.IntField = db_fields.IntField
-        self.LazyReferenceField = db_fields.LazyReferenceField
-        self.LineStringField = db_fields.LineStringField
-        self.ListField = db_fields.ListField
-        self.LongField = db_fields.LongField
-        self.MapField = db_fields.MapField
-        self.MultiLineStringField = db_fields.MultiLineStringField
-        self.MultiPointField = db_fields.MultiPointField
-        self.MultiPolygonField = db_fields.MultiPolygonField
-        self.ObjectIdField = db_fields.ObjectIdField
-        self.PointField = db_fields.PointField
-        self.PolygonField = db_fields.PolygonField
-        self.ReferenceField = db_fields.ReferenceField
-        self.SequenceField = db_fields.SequenceField
-        self.SortedListField = db_fields.SortedListField
-        self.StringField = db_fields.StringField
-        self.URLField = db_fields.URLField
-        self.UUIDField = db_fields.UUIDField
+    Any attribute not defined here (fields, ``connect``, errors, ...) is proxied
+    to the :mod:`mongoengine` module, so ``db.StringField`` is
+    :class:`mongoengine.fields.StringField`.
+    """
 
-        # Flask related data
-        self.app = None
+    # Extended documents classes
+    Document = documents.Document
+    DynamicDocument = documents.DynamicDocument
+    EmbeddedDocument = documents.EmbeddedDocument
+    DynamicEmbeddedDocument = documents.DynamicEmbeddedDocument
+
+    def __init__(self, app: Flask | None = None, config: dict | None = None):
+        self.app: Flask | None = None
         self.config = config
-
-        # Extended documents classes
-        self.Document = documents.Document
-        self.DynamicDocument = documents.DynamicDocument
 
         if app is not None:
             self.init_app(app, config)
+        elif config is not None:
+            _warn_flat_config(stacklevel=2)
 
-    def init_app(self, app, config=None):
-        if not app or not isinstance(app, Flask):
+    def init_app(self, app: Flask, config: dict | None = None) -> None:
+        if not isinstance(app, Flask):
             raise TypeError("Invalid Flask application instance")
 
         if config is not None:
-            warnings.warn(
-                (
-                    "Passing flat configuration is deprecated. Please check "
-                    "https://flask-mongoengine2.readthedocs.io/en/latest/flask_config.html "
-                    "for more info."
-                ),
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        self.app = app
+            _warn_flat_config(stacklevel=2)
+            # Passed config has max priority over init config.
+            self.config = config
 
-        app.extensions = getattr(app, "extensions", {})
-
-        if "mongoengine" not in app.extensions:
-            app.extensions["mongoengine"] = {}
-
-        if self in app.extensions["mongoengine"]:
+        extensions = app.extensions.setdefault("mongoengine", {})
+        if self in extensions:
             # Raise an exception if extension already initialized as
             # potentially new configuration would not be loaded.
             raise ValueError("Extension already initialized")
 
-        if config:
-            # Passed config have max priority, over init config.
-            self.config = config
+        # If no configs passed, use app.config.
+        connections = create_connections(self.config or app.config)
 
-        if not self.config:
-            # If no configs passed, use app.config.
-            self.config = app.config
-
-        # Obtain db connection(s)
-        connections = create_connections(self.config)
-
+        self.app = app
         # Store objects in application instance so that multiple apps do not
         # end up accessing the same objects.
-        s = {"app": app, "conn": connections}
-        app.extensions["mongoengine"][self] = s
+        extensions[self] = {"app": app, "conn": connections}
 
     @property
-    def connection(self) -> dict:
+    def connection(self) -> dict[str, MongoClient]:
         """
         Return MongoDB connection(s) associated with this MongoEngine
         instance.
         """
         return current_app.extensions["mongoengine"][self]["conn"]
 
-    def __getattr__(self, attr_name):
+    def __getattr__(self, attr_name: str) -> Any:
         """
         Mongoengine backward compatibility handler.
 
-        Provide original :module:``mongoengine`` module methods/classes if they are not
+        Provide original :mod:`mongoengine` module methods/classes if they are not
         modified by us, and not mapped directly.
         """
-        return getattr(mongoengine, attr_name)
+        if attr_name.startswith("__") and attr_name.endswith("__"):
+            raise AttributeError(attr_name)
+        try:
+            return getattr(mongoengine, attr_name)
+        except AttributeError:
+            raise AttributeError(
+                f"{type(self).__name__!r} object has no attribute {attr_name!r}"
+            ) from None

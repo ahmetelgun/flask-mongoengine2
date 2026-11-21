@@ -17,15 +17,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mongodb-version: [5.0]
+        mongodb-version: ["8.0"]
         include:
           - name: "coverage"
-            python: "3.10"
+            python: "3.13"
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v5
     - name: Set up Python ${{ matrix.python }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python }}
     - name: Install dependencies
@@ -33,20 +33,13 @@ jobs:
         python -m pip install --upgrade pip
         pip install nox virtualenv
     - name: Start MongoDB
-      uses: supercharge/mongodb-github-action@1.7.0
+      uses: supercharge/mongodb-github-action@1.12.0
       with:
         mongodb-version: ${{ matrix.mongodb-version }}
     - name: Test build
       run: "nox -s 'latest-${{ matrix.python }}(toolbar=True)' -- --cov-report=xml --cov-report=html"
     - name: Send coverage report to codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       with:
-        file: ./coverage.xml
-    - name: Send coverage report to codeclimate
-      uses: paambaati/codeclimate-action@v3.0.0
-      continue-on-error: true
-      with:
-        coverageCommand: echo "Ignore rerun"
-        coverageLocations: ${{github.workspace}}/coverage.xml:coverage.py
-      env:
-        CC_TEST_REPORTER_ID: ${{secrets.CC_TEST_REPORTER_ID}}
+        files: ./coverage.xml
+        token: ${{ secrets.CODECOV_TOKEN }}

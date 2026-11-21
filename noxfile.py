@@ -1,51 +1,42 @@
-"""Nox tool configuration file.
+"""Nox tool configuration file."""
 
-Nox is Tox tool replacement.
-"""
 import shutil
 from pathlib import Path
 
 import nox
 
 nox.options.sessions = "latest", "lint", "documentation_tests"
-db_version = "5.0"
+nox.options.default_venv_backend = "uv|virtualenv"
+
+PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
+DB_VERSION = "8.0"
+# Lowest supported versions and latest allowed versions.
+DEPENDENCY_SETS = {
+    "minimum": ["Flask==3.1.0", "mongoengine==0.29.1", "pymongo==4.18.3"],
+    "latest": ["Flask>=3.1.0", "mongoengine>=0.29.1,<0.30", "pymongo>=4.18.3,<5"],
+}
 
 
-def base_install(session, flask, mongoengine, toolbar):
+def base_install(session, deps, toolbar):
     """Create basic environment setup for tests and linting."""
-    session.run("python", "-m", "pip", "install", "--upgrade", "pip")
-    session.run("python", "-m", "pip", "install", "setuptools_scm[toml]>=6.3.1")
-
-    if toolbar:
-        extra = "toolbar,"
-    else:
-        extra = ""
-
-    session.install(
-        f"Flask{flask}",
-        f"mongoengine{mongoengine}",
-        "-e",
-        f".[{extra}dev]",
-    )
+    extra = "toolbar,dev" if toolbar else "dev"
+    session.install(*DEPENDENCY_SETS[deps], "-e", f".[{extra}]")
     return session
 
 
-@nox.session(python="3.10")
+@nox.session(python="3.13")
 def lint(session):
     """Run linting check locally."""
     session.install("pre-commit")
     session.run("pre-commit", "run", "-a")
 
 
-@nox.session(python=["3.8", "3.9", "3.10", "3.11"])
-@nox.parametrize("flask", [">=2.3.0", ">=3.0.0"])
-@nox.parametrize(
-    "mongoengine", ["==0.21.0", "==0.22.1", "==0.23.1", ">=0.24.1", ">=0.27.0"]
-)
+@nox.session(python=PYTHON_VERSIONS)
+@nox.parametrize("deps", list(DEPENDENCY_SETS))
 @nox.parametrize("toolbar", [True, False])
-def ci_cd_tests(session, flask, mongoengine, toolbar):
+def ci_cd_tests(session, deps, toolbar):
     """Run test suite with pytest into ci_cd (no docker)."""
-    session = base_install(session, flask, mongoengine, toolbar)
+    session = base_install(session, deps, toolbar)
     session.run("pytest", *session.posargs)
 
 
@@ -58,7 +49,7 @@ def _run_in_docker(session):
         "-p",
         "27017:27017",
         "-d",
-        f"mongo:{db_version}",
+        f"mongo:{DB_VERSION}",
         external=True,
     )
     try:
@@ -67,38 +58,33 @@ def _run_in_docker(session):
         session.run_always("docker", "rm", "-fv", "nox_docker_test", external=True)
 
 
-@nox.session(python=["3.8", "3.9", "3.10", "3.11"])
-@nox.parametrize("flask", [">=2.3.0", ">=3.0.0"])
-@nox.parametrize(
-    "mongoengine", ["==0.21.0", "==0.22.1", "==0.23.1", ">=0.24.1", ">=0.27.0"]
-)
+@nox.session(python=PYTHON_VERSIONS)
+@nox.parametrize("deps", list(DEPENDENCY_SETS))
 @nox.parametrize("toolbar", [True, False])
-def full_tests(session, flask, mongoengine, toolbar):
+def full_tests(session, deps, toolbar):
     """Run tests locally with docker and complete support matrix."""
-    session = base_install(session, flask, mongoengine, toolbar)
+    session = base_install(session, deps, toolbar)
     _run_in_docker(session)
 
 
-@nox.session(python=["3.8", "3.9", "3.10", "3.11"])
+@nox.session(python=PYTHON_VERSIONS)
 @nox.parametrize("toolbar", [True, False])
 def latest(session, toolbar):
     """Run minimum tests for checking minimum code quality."""
-    flask = ">=3.0.0"
-    mongoengine = ">=0.27.0"
-    session = base_install(session, flask, mongoengine, toolbar)
+    session = base_install(session, "latest", toolbar)
     if session.interactive:
         _run_in_docker(session)
     else:
         session.run("pytest", *session.posargs)
 
 
-@nox.session(python="3.10")
+@nox.session(python="3.13")
 def documentation_tests(session):
     """Run documentation tests."""
     return docs(session, batch_run=True)
 
 
-@nox.session(python="3.10")
+@nox.session(python="3.13")
 def docs(session, batch_run: bool = False):
     """Build the documentation or serve documentation interactively."""
     shutil.rmtree(Path("docs").joinpath("_build"), ignore_errors=True)

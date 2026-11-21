@@ -2,21 +2,22 @@
 name = "flask-mongoengine2"
 description = "Flask extension that provides integration with MongoEngine."
 readme = "README.md"
-requires-python = ">=3.8"
-license = {text = "BSD 3-Clause License"}
+requires-python = ">=3.10"
+license = "BSD-3-Clause"
+license-files = ["LICENSE.md"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Environment :: Web Environment",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: BSD License",
   "Operating System :: OS Independent",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: Implementation :: PyPy",
   "Programming Language :: Python :: Implementation :: CPython",
   "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
@@ -24,36 +25,26 @@ classifiers = [
   "Framework :: Flask",
 ]
 dependencies = [
-  "Flask>=2.3.0",
-  "mongoengine>=0.21, <0.28",
-  'importlib-metadata; python_version<"3.8"',
+  "Flask>=3.1.0",
+  # mongoengine<0.29.1 cannot be imported with recent pymongo versions.
+  "mongoengine>=0.29.1,<0.30",
+  "pymongo>=4.18.3,<5",
 ]
-keywords = [
-  "flask",
-  "forms",
-  "mongo",
-  "pymongo",
-  "mongoengine",
-  "extension"
-]
+keywords = ["flask", "mongo", "pymongo", "mongoengine", "extension"]
 maintainers = [
   {name = "Ahmet Elgün", email = "ahmetelgn@gmail.com"}
 ]
 dynamic = ["version"]
 
 [project.optional-dependencies]
-toolbar = ["Flask-DebugToolbar>=0.11.0"]
+toolbar = ["Flask-DebugToolbar>=0.15.0"]
 dev = [
-  "black==22.6.0",
   "pre-commit",
-  "pytest",
+  "pytest>=8",
   "pytest-cov",
   "pytest-mock",
   "nox",
-  "Pillow>=7.0.0",
-  "blinker",
 ]
-
 
 [project.urls]
 Homepage = "https://github.com/ahmetelgun/flask-mongoengine2"
@@ -62,56 +53,50 @@ Repository = "https://github.com/ahmetelgun/flask-mongoengine2"
 Changelog = "https://github.com/ahmetelgun/flask-mongoengine2/releases"
 
 [build-system]
-requires = [
-  "setuptools>=45",
-  "setuptools_scm[toml]>=6.3.1",
-  "wheel"
-]
+requires = ["setuptools>=77", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 zip-safe = false
-platforms = ["any"]
-packages=["flask_mongoengine2"]
+include-package-data = true
 
-[tool.setuptools.dynamic]
-version = {attr = "flask_mongoengine2._version.version"}
+[tool.setuptools.packages.find]
+include = ["flask_mongoengine2*"]
 
 [tool.setuptools_scm]
-write_to = "flask_mongoengine2/_version.py"
+version_file = "flask_mongoengine2/_version.py"
+version_scheme = "release-branch-semver"
+local_scheme = "no-local-version"
 
-[tool.black]
+[tool.ruff]
 line-length = 88
-target-version = ['py37']
-exclude = '''
-/(
-    \.eggs
-  | \.git
-  | \.tox
-  | \.venv
-  | \.vscode
-  | docs
-  | _build
-  | buck-out
-  | build
-  | dist
-)/
-'''
+target-version = "py310"
+extend-exclude = ["docs"]
 
-[tool.isort]
-profile = "black"
-line_length = 88
-multi_line_output = 3
-include_trailing_comma = true
-force_grid_wrap = 0
-use_parentheses = true
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "C4", "PIE", "RUF"]
+# RUF012: mongoengine uses mutable class level `meta` dicts by design.
+ignore = ["E501", "RUF012"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 17
 
 [tool.pytest.ini_options]
-addopts = "--cov=flask_mongoengine2 --cov-config=setup.cfg"
+addopts = "--cov=flask_mongoengine2 --cov-report=term-missing"
 testpaths = ["tests"]
 filterwarnings = [
   "error",
   "ignore::ResourceWarning",
-  "ignore::DeprecationWarning:flask_mongoengine2",
-  "ignore::DeprecationWarning:tests",
-  ]
+]
+
+[tool.coverage.run]
+omit = ["flask_mongoengine2/_version.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_also = [
+  "def __repr__",
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+]

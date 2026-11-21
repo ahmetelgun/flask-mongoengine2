@@ -1,5 +1,6 @@
+import os
+from collections.abc import Iterator
 from datetime import datetime, timezone
-from typing import NoReturn
 
 import mongoengine
 import pytest
@@ -8,24 +9,32 @@ from pymongo import MongoClient
 
 from flask_mongoengine2 import MongoEngine
 
+MONGO_HOST = os.environ.get("MONGO_TEST_HOST", "localhost")
+MONGO_PORT = int(os.environ.get("MONGO_TEST_PORT", "27017"))
+TEST_DATABASES = (
+    "flask_mongoengine_test_db",
+    "flask_mongoengine_test_db_1",
+    "flask_mongoengine_test_db_2",
+    "flask_mongoengine_list_test_db",
+)
+
 
 @pytest.fixture(autouse=True, scope="session")
-def session_clean_up() -> NoReturn:
+def session_clean_up() -> Iterator[None]:
     """Mandatory tests environment clean up before/after test session."""
-    client = MongoClient("localhost", 27017)
-    client.drop_database("flask_mongoengine_test_db")
-    client.drop_database("flask_mongoengine_test_db_1")
-    client.drop_database("flask_mongoengine_test_db_2")
+    client = MongoClient(MONGO_HOST, MONGO_PORT)
+    for name in TEST_DATABASES:
+        client.drop_database(name)
 
     yield
 
-    client.drop_database("flask_mongoengine_test_db")
-    client.drop_database("flask_mongoengine_test_db_1")
-    client.drop_database("flask_mongoengine_test_db_2")
+    for name in TEST_DATABASES:
+        client.drop_database(name)
+    client.close()
 
 
 @pytest.fixture()
-def app() -> Flask:
+def app() -> Iterator[Flask]:
     app = Flask(__name__)
     app.config["TESTING"] = True
 
@@ -36,14 +45,13 @@ def app() -> Flask:
 
 
 @pytest.fixture()
-def db(app) -> MongoEngine:
+def db(app) -> Iterator[MongoEngine]:
     app.config["MONGODB_SETTINGS"] = [
         {
             "db": "flask_mongoengine_test_db",
-            "host": "localhost",
-            "port": 27017,
+            "host": MONGO_HOST,
+            "port": MONGO_PORT,
             "alias": "default",
-            "uuidRepresentation": "standard",
         }
     ]
     test_db = MongoEngine(app)
@@ -71,7 +79,7 @@ def todo(db):
         title = mongoengine.StringField(max_length=60)
         text = mongoengine.StringField()
         done = mongoengine.BooleanField(default=False)
-        pub_date = mongoengine.DateTimeField(default=datetime.now(timezone.utc))
+        pub_date = mongoengine.DateTimeField(default=lambda: datetime.now(timezone.utc))
         comments = mongoengine.ListField(mongoengine.StringField())
         comment_count = mongoengine.IntField()
 

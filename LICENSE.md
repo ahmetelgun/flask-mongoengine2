@@ -1,7 +1,7 @@
 # BSD 3-Clause License
 
 Copyright (c) 2010-2024, the respective contributors, as shown by
-the [AUTHORS.md](AUTHORS.md) file.
+the [AUTHORS.md](https://github.com/ahmetelgun/flask-mongoengine2/blob/main/AUTHORS.md) file.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are

@@ -2,6 +2,28 @@
 Old changelog
 =============
 
+Changes in 3.0.0
+================
+- Dependencies: Flask>=3.1, mongoengine>=0.29.1,<0.30, pymongo>=4.18.3,<5
+  (security fixes). Python 3.10 - 3.14 supported, 3.8/3.9 dropped.
+- Fix: same ``MongoEngine`` instance reused ``app.config`` of the first app on
+  subsequent ``init_app`` calls.
+- Fix: session cookie ignored ``SESSION_COOKIE_SECURE``, ``SAMESITE``, ``PATH`` and
+  ``PARTITIONED`` settings.
+- Fix: cleared sessions were kept in database; stored expiration was not refreshed
+  together with cookie for permanent sessions.
+- Fix: debug panel paired monitoring events by ``operation_id`` (wrong for bulk
+  writes) and crashed on events without started event; reported size was shallow.
+- Fix: debug panel appended a new template loader on every request (memory leak).
+- Fix: ``BaseQuerySet.paginate_field`` returned 500 instead of 404 for missing
+  document.
+- Performance: ``ListFieldPagination`` counts array items server side with
+  ``$size`` instead of downloading the full array; ``paginate_field`` no longer
+  loads full document; out of range pages skip the items query; lazy debug logging
+  in monitoring listener.
+- Removed unused ``flask_mongoengine2.decorators`` module.
+- Tooling: ruff replaces black/isort/flake8; ``setup.py``/``setup.cfg`` removed.
+
 Changes in 2.0.0
 ================
 - Forked from flask-mongoengine to flask-mongoengine2
